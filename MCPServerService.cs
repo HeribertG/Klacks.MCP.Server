@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Klacks.Docs;
+using Klacks.Api.Domain.Services.Holidays;
 
 namespace Klacks.MCP.Server;
 
@@ -201,6 +202,22 @@ public class MCPServerService : BackgroundService
                     Type = "object",
                     Properties = new Dictionary<string, object>()
                 }
+            },
+            new
+            {
+                Name = "validate_calendar_rule",
+                Description = "Validiert eine Feiertagsregel und berechnet das resultierende Datum. Unterstützt feste Daten (MM/DD), Oster-bezogene (EASTER+XX) und SubRules (SA+2;SU+1)",
+                InputSchema = new
+                {
+                    Type = "object",
+                    Properties = new Dictionary<string, object>
+                    {
+                        ["rule"] = new { type = "string", description = "Die Regel (z.B. '01/01', 'EASTER+39', '11/22+000+TH')" },
+                        ["subRule"] = new { type = "string", description = "Optionale SubRule für Wochenend-Verschiebung (z.B. 'SA+2;SU+1')" },
+                        ["year"] = new { type = "integer", description = "Jahr für die Berechnung (Standard: aktuelles Jahr)" }
+                    },
+                    Required = new[] { "rule" }
+                }
             }
         };
 
@@ -311,6 +328,13 @@ public class MCPServerService : BackgroundService
                 Name = "Makro-Dokumentation",
                 Description = "BASIC-ähnliche Skriptsprache für Berechnungen (Zuschläge, Stunden, etc.)",
                 MimeType = "text/markdown"
+            },
+            new
+            {
+                Uri = "klacks://docs/calendar-rules",
+                Name = "Ewigkeitskalender Feiertagsregeln",
+                Description = "Regelformate für die automatische Berechnung von Feiertagen",
+                MimeType = "text/markdown"
             }
         };
 
@@ -370,6 +394,7 @@ public class MCPServerService : BackgroundService
             "search_clients" => await SearchClientsAsync(arguments),
             "create_contract" => await CreateContractAsync(arguments),
             "get_system_info" => await GetSystemInfoAsync(),
+            "validate_calendar_rule" => await ValidateCalendarRuleAsync(arguments),
             _ => $"Unknown tool: {toolName}"
         };
     }
@@ -472,9 +497,75 @@ public class MCPServerService : BackgroundService
             Uptime = DateTime.UtcNow.ToString("O"),
             Capabilities = new[] { "client_management", "contract_management", "search", "mcp_protocol", "documentation" },
             SupportedLanguages = new[] { "de", "en", "fr", "it" },
-            AvailableTools = new[] { "create_client", "search_clients", "create_contract", "get_system_info" },
-            AvailableDocs = new[] { "general", "clients", "shifts", "identity-providers", "macros" }
+            AvailableTools = new[] { "create_client", "search_clients", "create_contract", "get_system_info", "validate_calendar_rule" },
+            AvailableDocs = new[] { "general", "clients", "shifts", "identity-providers", "macros", "calendar-rules" }
         }, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    private async Task<string> ValidateCalendarRuleAsync(JsonElement arguments)
+    {
+        var rule = arguments.GetProperty("rule").GetString();
+        var subRule = arguments.TryGetProperty("subRule", out var subRuleProp) ? subRuleProp.GetString() : null;
+        var year = arguments.TryGetProperty("year", out var yearProp) ? yearProp.GetInt32() : DateTime.Now.Year;
+
+        _logger.LogInformation("Validating calendar rule: {Rule}, SubRule: {SubRule}, Year: {Year}", rule, subRule, year);
+
+        if (string.IsNullOrWhiteSpace(rule))
+        {
+            return JsonSerializer.Serialize(new
+            {
+                IsValid = false,
+                ErrorMessage = "Rule cannot be empty"
+            }, new JsonSerializerOptions { WriteIndented = true });
+        }
+
+        try
+        {
+            var calculator = new HolidaysListCalculator();
+            calculator.CurrentYear = year;
+
+            var testRule = new Klacks.Api.Domain.Models.Settings.CalendarRule
+            {
+                Rule = rule,
+                SubRule = subRule ?? string.Empty,
+                IsMandatory = true
+            };
+
+            calculator.Add(testRule);
+            calculator.ComputeHolidays();
+
+            if (calculator.HolidayList.Count > 0)
+            {
+                var holiday = calculator.HolidayList[0];
+                return JsonSerializer.Serialize(new
+                {
+                    IsValid = true,
+                    Year = year,
+                    Rule = rule,
+                    SubRule = subRule,
+                    CalculatedDate = holiday.CurrentDate.ToString("yyyy-MM-dd"),
+                    FormattedDate = holiday.FormatDate,
+                    DayOfWeek = holiday.CurrentDate.DayOfWeek.ToString()
+                }, new JsonSerializerOptions { WriteIndented = true });
+            }
+            else
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    IsValid = false,
+                    ErrorMessage = "Rule did not produce a valid date"
+                }, new JsonSerializerOptions { WriteIndented = true });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error validating calendar rule: {Rule}", rule);
+            return JsonSerializer.Serialize(new
+            {
+                IsValid = false,
+                ErrorMessage = $"Invalid rule format: {ex.Message}"
+            }, new JsonSerializerOptions { WriteIndented = true });
+        }
     }
 
     private async Task<string> GetClientsResourceAsync()
