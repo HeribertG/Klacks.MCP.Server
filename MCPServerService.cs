@@ -7,9 +7,9 @@ namespace Klacks.MCP.Server;
 
 public class MCPServerService : BackgroundService
 {
-    private readonly ILogger&lt;MCPServerService&gt; _logger;
-    
-    public MCPServerService(ILogger&lt;MCPServerService&gt; logger)
+    private readonly ILogger<MCPServerService> _logger;
+
+    public MCPServerService(ILogger<MCPServerService> logger)
     {
         _logger = logger;
     }
@@ -17,23 +17,23 @@ public class MCPServerService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Klacks MCP Server starting...");
-        
+
         try
         {
             await using var stdin = Console.OpenStandardInput();
             await using var stdout = Console.OpenStandardOutput();
-            
+
             using var reader = new StreamReader(stdin);
             await using var writer = new StreamWriter(stdout) { AutoFlush = true };
-            
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 var line = await reader.ReadLineAsync();
                 if (line == null) break;
-                
+
                 try
                 {
-                    var request = JsonSerializer.Deserialize&lt;MCPRequest&gt;(line);
+                    var request = JsonSerializer.Deserialize<MCPRequest>(line);
                     if (request != null)
                     {
                         var response = await ProcessRequestAsync(request);
@@ -69,24 +69,24 @@ public class MCPServerService : BackgroundService
         {
             _logger.LogError(ex, "MCP Server error");
         }
-        
+
         _logger.LogInformation("Klacks MCP Server stopped");
     }
-    
-    private async Task&lt;MCPResponse&gt; ProcessRequestAsync(MCPRequest request)
+
+    private async Task<MCPResponse> ProcessRequestAsync(MCPRequest request)
     {
         _logger.LogInformation("Processing MCP request: {Method}", request.Method);
-        
+
         try
         {
             return request.Method switch
             {
-                "initialize" =&gt; await HandleInitializeAsync(request),
-                "tools/list" =&gt; await HandleToolsListAsync(request),
-                "tools/call" =&gt; await HandleToolCallAsync(request),
-                "resources/list" =&gt; await HandleResourcesListAsync(request),
-                "resources/read" =&gt; await HandleResourceReadAsync(request),
-                _ =&gt; new MCPResponse
+                "initialize" => await HandleInitializeAsync(request),
+                "tools/list" => await HandleToolsListAsync(request),
+                "tools/call" => await HandleToolCallAsync(request),
+                "resources/list" => await HandleResourcesListAsync(request),
+                "resources/read" => await HandleResourceReadAsync(request),
+                _ => new MCPResponse
                 {
                     Id = request.Id,
                     Error = new MCPError
@@ -113,8 +113,8 @@ public class MCPServerService : BackgroundService
             };
         }
     }
-    
-    private async Task&lt;MCPResponse&gt; HandleInitializeAsync(MCPRequest request)
+
+    private async Task<MCPResponse> HandleInitializeAsync(MCPRequest request)
     {
         return new MCPResponse
         {
@@ -137,8 +137,8 @@ public class MCPServerService : BackgroundService
             }
         };
     }
-    
-    private async Task&lt;MCPResponse&gt; HandleToolsListAsync(MCPRequest request)
+
+    private async Task<MCPResponse> HandleToolsListAsync(MCPRequest request)
     {
         var tools = new object[]
         {
@@ -149,7 +149,7 @@ public class MCPServerService : BackgroundService
                 InputSchema = new
                 {
                     Type = "object",
-                    Properties = new Dictionary&lt;string, object&gt;
+                    Properties = new Dictionary<string, object>
                     {
                         ["firstName"] = new { type = "string", description = "Vorname des Mitarbeiters" },
                         ["lastName"] = new { type = "string", description = "Nachname des Mitarbeiters" },
@@ -166,7 +166,7 @@ public class MCPServerService : BackgroundService
                 InputSchema = new
                 {
                     Type = "object",
-                    Properties = new Dictionary&lt;string, object&gt;
+                    Properties = new Dictionary<string, object>
                     {
                         ["searchTerm"] = new { type = "string", description = "Suchbegriff" },
                         ["canton"] = new { type = "string", description = "Filter nach Kanton" },
@@ -182,7 +182,7 @@ public class MCPServerService : BackgroundService
                 InputSchema = new
                 {
                     Type = "object",
-                    Properties = new Dictionary&lt;string, object&gt;
+                    Properties = new Dictionary<string, object>
                     {
                         ["clientId"] = new { type = "string", description = "ID des Mitarbeiters" },
                         ["contractType"] = new { type = "string", description = "Vertragstyp (z.B. Vollzeit 160)" },
@@ -198,11 +198,11 @@ public class MCPServerService : BackgroundService
                 InputSchema = new
                 {
                     Type = "object",
-                    Properties = new Dictionary&lt;string, object&gt;()
+                    Properties = new Dictionary<string, object>()
                 }
             }
         };
-        
+
         return new MCPResponse
         {
             Id = request.Id,
@@ -212,8 +212,8 @@ public class MCPServerService : BackgroundService
             }
         };
     }
-    
-    private async Task&lt;MCPResponse&gt; HandleToolCallAsync(MCPRequest request)
+
+    private async Task<MCPResponse> HandleToolCallAsync(MCPRequest request)
     {
         if (request.Params?.Arguments == null)
         {
@@ -228,12 +228,12 @@ public class MCPServerService : BackgroundService
                 }
             };
         }
-        
+
         var toolName = request.Params.Name;
         var arguments = request.Params.Arguments;
-        
+
         var result = await ExecuteToolAsync(toolName!, arguments.Value);
-        
+
         return new MCPResponse
         {
             Id = request.Id,
@@ -250,8 +250,8 @@ public class MCPServerService : BackgroundService
             }
         };
     }
-    
-    private async Task&lt;MCPResponse&gt; HandleResourcesListAsync(MCPRequest request)
+
+    private async Task<MCPResponse> HandleResourcesListAsync(MCPRequest request)
     {
         var resources = new object[]
         {
@@ -265,7 +265,7 @@ public class MCPServerService : BackgroundService
             new
             {
                 Uri = "klacks://system/status",
-                Name = "System-Status", 
+                Name = "System-Status",
                 Description = "Aktueller System-Status",
                 MimeType = "application/json"
             },
@@ -275,9 +275,44 @@ public class MCPServerService : BackgroundService
                 Name = "Verträge",
                 Description = "Liste aller Verträge",
                 MimeType = "application/json"
+            },
+            new
+            {
+                Uri = "klacks://docs/general",
+                Name = "Allgemeine Hilfe",
+                Description = "Übersicht über Klacks-Funktionen und Navigation",
+                MimeType = "text/markdown"
+            },
+            new
+            {
+                Uri = "klacks://docs/clients",
+                Name = "Mitarbeiter-Dokumentation",
+                Description = "Hilfe zur Mitarbeiterverwaltung, Import und Verträgen",
+                MimeType = "text/markdown"
+            },
+            new
+            {
+                Uri = "klacks://docs/shifts",
+                Name = "Schichtplanung-Dokumentation",
+                Description = "Hilfe zur Schichtplanung, Vorlagen und Regeln",
+                MimeType = "text/markdown"
+            },
+            new
+            {
+                Uri = "klacks://docs/identity-providers",
+                Name = "Identity Provider Dokumentation",
+                Description = "Hilfe zu LDAP, Active Directory und OAuth2 Konfiguration",
+                MimeType = "text/markdown"
+            },
+            new
+            {
+                Uri = "klacks://docs/macros",
+                Name = "Makro-Dokumentation",
+                Description = "Hilfe zu Textvorlagen und Platzhaltern",
+                MimeType = "text/markdown"
             }
         };
-        
+
         return new MCPResponse
         {
             Id = request.Id,
@@ -287,8 +322,8 @@ public class MCPServerService : BackgroundService
             }
         };
     }
-    
-    private async Task&lt;MCPResponse&gt; HandleResourceReadAsync(MCPRequest request)
+
+    private async Task<MCPResponse> HandleResourceReadAsync(MCPRequest request)
     {
         if (request.Params?.Uri == null)
         {
@@ -303,9 +338,9 @@ public class MCPServerService : BackgroundService
                 }
             };
         }
-        
-        var content = await ReadResourceAsync(request.Params.Uri);
-        
+
+        var (content, mimeType) = await ReadResourceAsync(request.Params.Uri);
+
         return new MCPResponse
         {
             Id = request.Id,
@@ -316,96 +351,121 @@ public class MCPServerService : BackgroundService
                     new
                     {
                         Uri = request.Params.Uri,
-                        MimeType = "application/json",
+                        MimeType = mimeType,
                         Text = content
                     }
                 }
             }
         };
     }
-    
-    private async Task&lt;string&gt; ExecuteToolAsync(string toolName, JsonElement arguments)
+
+    private async Task<string> ExecuteToolAsync(string toolName, JsonElement arguments)
     {
         _logger.LogInformation("Executing tool: {ToolName}", toolName);
-        
+
         return toolName switch
         {
-            "create_client" =&gt; await CreateClientAsync(arguments),
-            "search_clients" =&gt; await SearchClientsAsync(arguments),
-            "create_contract" =&gt; await CreateContractAsync(arguments),
-            "get_system_info" =&gt; await GetSystemInfoAsync(),
-            _ =&gt; $"❌ Unknown tool: {toolName}"
+            "create_client" => await CreateClientAsync(arguments),
+            "search_clients" => await SearchClientsAsync(arguments),
+            "create_contract" => await CreateContractAsync(arguments),
+            "get_system_info" => await GetSystemInfoAsync(),
+            _ => $"Unknown tool: {toolName}"
         };
     }
-    
-    private async Task&lt;string&gt; ReadResourceAsync(string uri)
+
+    private async Task<(string Content, string MimeType)> ReadResourceAsync(string uri)
     {
         _logger.LogInformation("Reading resource: {Uri}", uri);
-        
-        return uri switch
+
+        if (uri.StartsWith("klacks://docs/"))
         {
-            "klacks://clients" =&gt; await GetClientsResourceAsync(),
-            "klacks://system/status" =&gt; await GetSystemStatusAsync(),
-            "klacks://contracts" =&gt; await GetContractsResourceAsync(),
-            _ =&gt; $"❌ Unknown resource: {uri}"
+            var docName = uri.Replace("klacks://docs/", "");
+            var content = await ReadEmbeddedDocAsync(docName);
+            return (content, "text/markdown");
+        }
+
+        var jsonContent = uri switch
+        {
+            "klacks://clients" => await GetClientsResourceAsync(),
+            "klacks://system/status" => await GetSystemStatusAsync(),
+            "klacks://contracts" => await GetContractsResourceAsync(),
+            _ => $"Unknown resource: {uri}"
         };
+
+        return (jsonContent, "application/json");
     }
-    
-    private async Task&lt;string&gt; CreateClientAsync(JsonElement arguments)
+
+    private async Task<string> ReadEmbeddedDocAsync(string docName)
+    {
+        var assembly = typeof(MCPServerService).Assembly;
+        var resourceName = $"Klacks.MCP.Server.Resources.Docs.{docName}.md";
+
+        using var stream = assembly.GetManifestResourceStream(resourceName);
+        if (stream == null)
+        {
+            _logger.LogWarning("Documentation not found: {DocName}", docName);
+            return $"# Dokumentation nicht gefunden\n\nDie Dokumentation '{docName}' wurde nicht gefunden.\n\nVerfügbare Dokumentationen:\n- general\n- clients\n- shifts\n- identity-providers\n- macros";
+        }
+
+        using var reader = new StreamReader(stream);
+        return await reader.ReadToEndAsync();
+    }
+
+    private async Task<string> CreateClientAsync(JsonElement arguments)
     {
         var firstName = arguments.GetProperty("firstName").GetString();
         var lastName = arguments.GetProperty("lastName").GetString();
         var email = arguments.TryGetProperty("email", out var emailProp) ? emailProp.GetString() : null;
         var canton = arguments.TryGetProperty("canton", out var cantonProp) ? cantonProp.GetString() : null;
-        
+
         _logger.LogInformation("Creating client: {FirstName} {LastName}", firstName, lastName);
-        
-        return $"✅ Mitarbeiter {firstName} {lastName} wurde erfolgreich erstellt." +
-               (email != null ? $"\n📧 E-Mail: {email}" : "") +
-               (canton != null ? $"\n🏛️ Kanton: {canton}" : "");
+
+        return $"Mitarbeiter {firstName} {lastName} wurde erfolgreich erstellt." +
+               (email != null ? $"\nE-Mail: {email}" : "") +
+               (canton != null ? $"\nKanton: {canton}" : "");
     }
-    
-    private async Task&lt;string&gt; SearchClientsAsync(JsonElement arguments)
+
+    private async Task<string> SearchClientsAsync(JsonElement arguments)
     {
         var searchTerm = arguments.GetProperty("searchTerm").GetString();
         var canton = arguments.TryGetProperty("canton", out var cantonProp) ? cantonProp.GetString() : null;
         var limit = arguments.TryGetProperty("limit", out var limitProp) ? limitProp.GetInt32() : 10;
-        
+
         _logger.LogInformation("Searching clients: {SearchTerm}", searchTerm);
-        
+
         var results = new[]
         {
             new { Id = "1", FirstName = "Max", LastName = "Muster", Canton = "BE", Email = "max.muster@example.com" },
             new { Id = "2", FirstName = "Anna", LastName = "Schmidt", Canton = "ZH", Email = "anna.schmidt@example.com" },
-            new { Id = "3", FirstName = "Peter", LastName = "Müller", Canton = "SG", Email = "peter.mueller@example.com" }
+            new { Id = "3", FirstName = "Peter", LastName = "Mueller", Canton = "SG", Email = "peter.mueller@example.com" }
         };
-        
-        var filteredResults = canton != null ? 
-            results.Where(r =&gt; r.Canton.Equals(canton, StringComparison.OrdinalIgnoreCase)) : 
+
+        var filteredResults = canton != null ?
+            results.Where(r => r.Canton.Equals(canton, StringComparison.OrdinalIgnoreCase)) :
             results;
-            
+
         var limitedResults = filteredResults.Take(limit).ToArray();
-        
-        return $"🔍 Gefunden: {limitedResults.Length} Mitarbeiter mit Suchbegriff '{searchTerm}'" +
+
+        return $"Gefunden: {limitedResults.Length} Mitarbeiter mit Suchbegriff '{searchTerm}'" +
                (canton != null ? $" in Kanton {canton}" : "") +
-               "\n\n" + string.Join("\n", limitedResults.Select(r =&gt; 
-                   $"• {r.FirstName} {r.LastName} ({r.Canton}) - {r.Email}"));
+               "\n\n" + string.Join("\n", limitedResults.Select(r =>
+                   $"- {r.FirstName} {r.LastName} ({r.Canton}) - {r.Email}"));
     }
-    
-    private async Task&lt;string&gt; CreateContractAsync(JsonElement arguments)
+
+    private async Task<string> CreateContractAsync(JsonElement arguments)
     {
         var clientId = arguments.GetProperty("clientId").GetString();
         var contractType = arguments.GetProperty("contractType").GetString();
         var canton = arguments.GetProperty("canton").GetString();
-        
+
         _logger.LogInformation("Creating contract: {ContractType} for client {ClientId}", contractType, clientId);
-        
-        return $"📄 Vertrag '{contractType}' für Mitarbeiter {clientId} in {canton} wurde erfolgreich erstellt.\n" +
-               $"📅 Erstellungsdatum: {DateTime.Now:dd.MM.yyyy}\n" +
-               $"🏛️ Kanton: {canton}";
+
+        return $"Vertrag '{contractType}' fuer Mitarbeiter {clientId} in {canton} wurde erfolgreich erstellt.\n" +
+               $"Erstellungsdatum: {DateTime.Now:dd.MM.yyyy}\n" +
+               $"Kanton: {canton}";
     }
-    
-    private async Task&lt;string&gt; GetSystemInfoAsync()
+
+    private async Task<string> GetSystemInfoAsync()
     {
         return JsonSerializer.Serialize(new
         {
@@ -413,13 +473,14 @@ public class MCPServerService : BackgroundService
             Version = "1.0.0",
             Status = "running",
             Uptime = DateTime.UtcNow.ToString("O"),
-            Capabilities = new[] { "client_management", "contract_management", "search", "mcp_protocol" },
+            Capabilities = new[] { "client_management", "contract_management", "search", "mcp_protocol", "documentation" },
             SupportedLanguages = new[] { "de", "en", "fr", "it" },
-            AvailableTools = new[] { "create_client", "search_clients", "create_contract", "get_system_info" }
+            AvailableTools = new[] { "create_client", "search_clients", "create_contract", "get_system_info" },
+            AvailableDocs = new[] { "general", "clients", "shifts", "identity-providers", "macros" }
         }, new JsonSerializerOptions { WriteIndented = true });
     }
-    
-    private async Task&lt;string&gt; GetClientsResourceAsync()
+
+    private async Task<string> GetClientsResourceAsync()
     {
         return JsonSerializer.Serialize(new
         {
@@ -427,21 +488,21 @@ public class MCPServerService : BackgroundService
             {
                 new { Id = "1", FirstName = "Max", LastName = "Muster", Canton = "BE", Email = "max.muster@example.com", CreatedAt = "2024-01-15T10:30:00Z" },
                 new { Id = "2", FirstName = "Anna", LastName = "Schmidt", Canton = "ZH", Email = "anna.schmidt@example.com", CreatedAt = "2024-02-20T14:15:00Z" },
-                new { Id = "3", FirstName = "Peter", LastName = "Müller", Canton = "SG", Email = "peter.mueller@example.com", CreatedAt = "2024-03-10T09:45:00Z" }
+                new { Id = "3", FirstName = "Peter", LastName = "Mueller", Canton = "SG", Email = "peter.mueller@example.com", CreatedAt = "2024-03-10T09:45:00Z" }
             },
             Total = 3,
             LastUpdated = DateTime.UtcNow.ToString("O")
         }, new JsonSerializerOptions { WriteIndented = true });
     }
-    
-    private async Task&lt;string&gt; GetSystemStatusAsync()
+
+    private async Task<string> GetSystemStatusAsync()
     {
         return JsonSerializer.Serialize(new
         {
             Status = "running",
             Timestamp = DateTime.UtcNow.ToString("O"),
             Version = "1.0.0",
-            Features = new[] { "LLM", "MCP", "WebUI", "ClientManagement", "ContractManagement" },
+            Features = new[] { "LLM", "MCP", "WebUI", "ClientManagement", "ContractManagement", "Documentation" },
             Health = new
             {
                 Database = "healthy",
@@ -450,8 +511,8 @@ public class MCPServerService : BackgroundService
             }
         }, new JsonSerializerOptions { WriteIndented = true });
     }
-    
-    private async Task&lt;string&gt; GetContractsResourceAsync()
+
+    private async Task<string> GetContractsResourceAsync()
     {
         return JsonSerializer.Serialize(new
         {

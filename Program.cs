@@ -11,8 +11,8 @@ builder.Services.AddLogging(logging =>
     logging.SetMinimumLevel(LogLevel.Information);
 });
 
-builder.Services.AddSingleton&lt;MCPServerService&gt;();
-builder.Services.AddHostedService&lt;MCPServerService&gt;();
+builder.Services.AddSingleton<MCPServerService>();
+builder.Services.AddHostedService<MCPServerService>();
 
 var host = builder.Build();
 
