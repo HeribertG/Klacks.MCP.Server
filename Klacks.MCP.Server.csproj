@@ -1,23 +1,23 @@
-&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
+<Project Sdk="Microsoft.NET.Sdk">
 
-  &lt;PropertyGroup&gt;
-    &lt;OutputType&gt;Exe&lt;/OutputType&gt;
-    &lt;TargetFramework&gt;net8.0&lt;/TargetFramework&gt;
-    &lt;Nullable&gt;enable&lt;/Nullable&gt;
-    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
-  &lt;/PropertyGroup&gt;
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
 
-  &lt;ItemGroup&gt;
-    &lt;PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" /&gt;
-    &lt;PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" /&gt;
-    &lt;PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" /&gt;
-    &lt;PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" /&gt;
-    &lt;PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" /&gt;
-    &lt;PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" /&gt;
-  &lt;/ItemGroup&gt;
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
+  </ItemGroup>
 
-  &lt;ItemGroup&gt;
-    &lt;ProjectReference Include="../Klacks.Api/Klacks.Api.csproj" /&gt;
-  &lt;/ItemGroup&gt;
+  <ItemGroup>
+    <ProjectReference Include="..\Klacks.Api\Klacks.Api.csproj" />
+  </ItemGroup>
 
-&lt;/Project&gt;
+</Project>
