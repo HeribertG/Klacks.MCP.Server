@@ -18,10 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Klacks.Api\Klacks.Api.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="Resources\Docs\*.md" />
+    <ProjectReference Include="..\Klacks.Docs\Klacks.Docs.csproj" />
   </ItemGroup>
 
 </Project>

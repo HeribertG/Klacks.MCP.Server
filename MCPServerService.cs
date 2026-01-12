@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Klacks.Docs;
 
 namespace Klacks.MCP.Server;
 
@@ -308,7 +309,7 @@ public class MCPServerService : BackgroundService
             {
                 Uri = "klacks://docs/macros",
                 Name = "Makro-Dokumentation",
-                Description = "Hilfe zu Textvorlagen und Platzhaltern",
+                Description = "BASIC-ähnliche Skriptsprache für Berechnungen (Zuschläge, Stunden, etc.)",
                 MimeType = "text/markdown"
             }
         };
@@ -397,18 +398,14 @@ public class MCPServerService : BackgroundService
 
     private async Task<string> ReadEmbeddedDocAsync(string docName)
     {
-        var assembly = typeof(MCPServerService).Assembly;
-        var resourceName = $"Klacks.MCP.Server.Resources.Docs.{docName}.md";
-
-        using var stream = assembly.GetManifestResourceStream(resourceName);
-        if (stream == null)
+        if (!DocsReader.DocExists(docName))
         {
             _logger.LogWarning("Documentation not found: {DocName}", docName);
-            return $"# Dokumentation nicht gefunden\n\nDie Dokumentation '{docName}' wurde nicht gefunden.\n\nVerfügbare Dokumentationen:\n- general\n- clients\n- shifts\n- identity-providers\n- macros";
+            var availableDocs = string.Join("\n- ", DocsReader.GetAvailableDocs().Keys);
+            return $"# Dokumentation nicht gefunden\n\nDie Dokumentation '{docName}' wurde nicht gefunden.\n\nVerfügbare Dokumentationen:\n- {availableDocs}";
         }
 
-        using var reader = new StreamReader(stream);
-        return await reader.ReadToEndAsync();
+        return await DocsReader.ReadDocAsync(docName);
     }
 
     private async Task<string> CreateClientAsync(JsonElement arguments)
