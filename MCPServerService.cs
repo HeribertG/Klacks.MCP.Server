@@ -335,6 +335,13 @@ public class MCPServerService : BackgroundService
                 Name = "Ewigkeitskalender Feiertagsregeln",
                 Description = "Regelformate für die automatische Berechnung von Feiertagen",
                 MimeType = "text/markdown"
+            },
+            new
+            {
+                Uri = "klacks://docs/ai-system",
+                Name = "AI-System Dokumentation",
+                Description = "Soul, Memory & Guidelines - Persönlichkeit und Wissen des KI-Assistenten",
+                MimeType = "text/markdown"
             }
         };
 
@@ -498,7 +505,7 @@ public class MCPServerService : BackgroundService
             Capabilities = new[] { "client_management", "contract_management", "search", "mcp_protocol", "documentation" },
             SupportedLanguages = new[] { "de", "en", "fr", "it" },
             AvailableTools = new[] { "create_client", "search_clients", "create_contract", "get_system_info", "validate_calendar_rule" },
-            AvailableDocs = new[] { "general", "clients", "shifts", "identity-providers", "macros", "calendar-rules" }
+            AvailableDocs = new[] { "general", "clients", "shifts", "identity-providers", "macros", "calendar-rules", "ai-system" }
         }, new JsonSerializerOptions { WriteIndented = true });
     }
 
