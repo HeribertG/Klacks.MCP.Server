@@ -212,7 +212,7 @@ public class MCPServerService : BackgroundService
                     Type = "object",
                     Properties = new Dictionary<string, object>
                     {
-                        ["rule"] = new { type = "string", description = "Die Regel (z.B. '01/01', 'EASTER+39', '11/22+000+TH')" },
+                        ["rule"] = new { type = "string", description = "Die Regel (z.B. '01/01', 'EASTER+39', '11/22+00+TH')" },
                         ["subRule"] = new { type = "string", description = "Optionale SubRule für Wochenend-Verschiebung (z.B. 'SA+2;SU+1')" },
                         ["year"] = new { type = "integer", description = "Jahr für die Berechnung (Standard: aktuelles Jahr)" }
                     },
