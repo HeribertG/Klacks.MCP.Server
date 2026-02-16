@@ -1,7 +1,7 @@
 # Report Generator - Technical Specification
 
 > **Status:** Implementiert
-> **Last Updated:** 2026-02-06
+> **Last Updated:** 2026-02-16
 > **Architecture:** Clean Architecture (Domain/Application/Infrastructure/Presentation)
 
 ---
@@ -39,6 +39,7 @@ Konfigurierbarer Report Generator fuer verschiedene Datenquellen (Schedule, Adre
 - **Field Prefix System**: Automatische Prefix-Erkennung bei Label-Kollisionen zwischen DataSets
 - **Rich Styling**: Font-Familie, Groesse, Bold/Italic/Underline, Textfarbe, Ausrichtung pro Feld
 - **Header-Bilder**: Unterstuetzung fuer Bilder im Header (Firmenlogo etc.)
+- **Formel-Felder**: Berechnete Spalten via VB-aehnlichem Scripting mit Variablen-Zugriff auf Zeilendaten
 
 ### 1.3 Report-Struktur (Beispiel: Schedule mit Work + Expenses)
 
@@ -159,11 +160,12 @@ interface ReportField {
   format?: string;
   sortOrder: number;        // Im Header: Zeilen-Index
   imageUrl?: string;        // Fuer Image-Felder
+  formula?: string;         // VB-Script fuer Formula-Felder
 }
 
 enum ReportFieldType {
   Text = 0, Date = 1, Number = 2, Currency = 3,
-  Boolean = 4, Time = 5, Image = 6
+  Boolean = 4, Time = 5, Image = 6, Formula = 7
 }
 ```
 
@@ -199,7 +201,7 @@ interface ReportPageSetup {
 |------|-------|-----------|
 | `ReportType` | Schedule=0, Client=1, Invoice=2, Absence=3 | Template-Typ |
 | `ReportSectionType` | Header=0, WorkTable=1, ExpensesTable=2, Footer=3 | Sektions-Typ |
-| `ReportFieldType` | Text=0, Date=1, Number=2, Currency=3, Boolean=4, Time=5, Image=6 | Feld-Datentyp |
+| `ReportFieldType` | Text=0, Date=1, Number=2, Currency=3, Boolean=4, Time=5, Image=6, Formula=7 | Feld-Datentyp |
 | `ReportOrientation` | Portrait=0, Landscape=1 | Seitenausrichtung |
 | `ReportPageSize` | A4=0, A3=1, Letter=2 | Seitengroesse |
 | `TextAlignment` | Left=0, Center=1, Right=2 | Textausrichtung |
@@ -501,6 +503,51 @@ Zwei Buttons im Modal-Footer:
 - **Speichern** → Speichert, Modal bleibt offen
 - **Speichern & Schliessen** → Speichert und schliesst Modal
 
+### 6.10 Formel-Felder (Formula Fields)
+
+Berechnete Spalten mit VB-aehnlichem Scripting. Nutzt die bestehende Scripting-Engine (`ScriptService`).
+
+**Konzept:**
+- Formel-Felder koennen in Body-Tabellen und Table-Footern hinzugefuegt werden (nicht im Header)
+- `dataBinding` = `formula.{uuid}` (unique, kein Datenbinding)
+- `formula` = VB-Script-Ausdruck, z.B. `output = hours * 45.50`
+- Verfuegbare Variablen abhaengig von DataSource/DataSet
+
+**Designer-Integration:**
+- "f(x)"-Button am Ende der Tabellenspalten zum Hinzufuegen
+- Formel-Spalten mit lila Rand und `f(x)` Prefix
+- Toolbar: Formelname-Input + "f(x)" Edit-Button + Status (leer/gueltig/Fehler)
+- Formel-Editor Modal mit:
+  - Formelname
+  - Textarea fuer VB-Script
+  - PropertyGrid mit editierbaren Testvariablen (wie Makro-Werte-Tab)
+  - Test-Button + Ergebnis-Anzeige
+
+**Variablen pro DataSource:**
+
+| Source | DataSet | Variablen |
+|--------|---------|-----------|
+| schedule | work/workChange | hours, surcharges, startTime, endTime, weekday, entryType, information |
+| schedule | expenses | amount, taxable, description |
+| absence-gantt | absences | fromDate, untilDate, absenceName, defaultValue, clientName, clientFirstName |
+| all-address | clients | idNumber, name, firstName, company, birthdate, gender |
+| group | groups | name, parentName |
+
+**Footer-Variablen:** totalRows (alle Sources) + source-spezifische Summen (totalHours, totalSurcharges, totalWorkDays, totalExpenses).
+
+**FormulaEvaluationService:**
+- `compileFormula(formula)` — einmalig kompilieren, cached
+- `executeCompiled(compiled, variables)` — pro Row ausfuehren (Performance)
+- `evaluateFormula(formula, variables)` — Compile + Execute (Test)
+- `validateFormula(formula)` — nur Syntax-Check
+- Script-Konvention: `External output\n` wird prepended, Ergebnis aus `output`-Variable
+
+**Test-Daten-Klassen** (nach ShiftData/PropertyGrid Pattern):
+- `ScheduleWorkTestData`, `ScheduleExpensesTestData`, `AbsenceTestData`, `ClientTestData`, `GroupTestData`
+- Footer-Varianten: `ScheduleFooterTestData`, `AbsenceFooterTestData`, etc.
+- Jede Klasse: Default-Werte + `static metadata: PropertyMetadata`
+- PropertyGrid zeigt editierbare Testvariablen im Formel-Editor
+
 ---
 
 ## 7. PDF Generation
@@ -555,6 +602,7 @@ jsPDF.output('blob') -> Blob
 - Header-Zeile: Dunkelgrau (#424242), weisse Schrift, Bold, 9pt
 - Body: 9pt, Styles aus FieldStyle (Groesse, Bold/Italic, Alignment)
 - Alternierende Zeilen: #F5F5F5
+- **Formel-Felder**: Vor der Row-Schleife einmal kompiliert (`compileFormula`), dann pro Row `executeCompiled(compiled, provider.buildFormulaVariables(row))`. Bei Fehler wird `#ERR` angezeigt (PDF-Generierung wird nicht abgebrochen)
 
 ### 7.5 Footer-Rendering
 
@@ -657,11 +705,14 @@ Klacks.Ui/src/app/
 |   |   +-- report-section.model.ts        # ReportSection, SectionType
 |   |   +-- report-field.model.ts          # ReportField, FieldStyle, DataBindingDefinition
 |   |   +-- report-data-source.model.ts    # DataSource/DataSet-Definitionen, Hilfsfunktionen
+|   |   +-- formula-variables.model.ts     # FormulaVariableDefinition, FORMULA_VARIABLES pro Source
+|   |   +-- formula-test-data.ts           # Test-Daten-Klassen fuer PropertyGrid (ScheduleWorkTestData etc.)
 |   +-- services/report/
 |   |   +-- report.service.ts              # downloadPdf(), openPdfPreview()
 |   |   +-- report-pdf.service.ts          # PDF-Generierung mit jsPDF
 |   |   +-- report-data-provider.service.ts # Daten-Provider pro Source
 |   |   +-- data-management-report.service.ts # State Management (Signals)
+|   |   +-- formula-evaluation.service.ts  # FormulaEvaluationService (compile, execute, validate)
 |   +-- models/
 |       +-- work-schedule-class.ts         # IScheduleCell, IWorkScheduleClient
 |
@@ -769,6 +820,8 @@ interface ReportDataProvider {
   resolveFieldValue(field: ReportField, row: any): string;
   resolveHeaderValue(field: ReportField, context: ReportHeaderContext): string;
   resolveFooterValue(field: ReportField, rows: any[]): string;
+  buildFormulaVariables?(row: any): ExternalVariables;             // Variablen fuer Formel-Felder pro Row
+  buildFooterFormulaVariables?(rows: any[]): ExternalVariables;    // Variablen fuer Footer-Formeln
 }
 ```
 
