@@ -10,10 +10,12 @@ namespace Klacks.MCP.Server;
 public class MCPServerService : BackgroundService
 {
     private readonly ILogger<MCPServerService> _logger;
+    private readonly KlacksApiClient _apiClient;
 
-    public MCPServerService(ILogger<MCPServerService> logger)
+    public MCPServerService(ILogger<MCPServerService> logger, KlacksApiClient apiClient)
     {
         _logger = logger;
+        _apiClient = apiClient;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -442,71 +444,79 @@ public class MCPServerService : BackgroundService
 
     private async Task<string> CreateClientAsync(JsonElement arguments)
     {
-        var firstName = arguments.GetProperty("firstName").GetString();
-        var lastName = arguments.GetProperty("lastName").GetString();
+        var firstName = arguments.GetProperty("firstName").GetString()!;
+        var lastName = arguments.GetProperty("lastName").GetString()!;
         var email = arguments.TryGetProperty("email", out var emailProp) ? emailProp.GetString() : null;
         var canton = arguments.TryGetProperty("canton", out var cantonProp) ? cantonProp.GetString() : null;
 
-        _logger.LogInformation("Creating client: {FirstName} {LastName}", firstName, lastName);
+        _logger.LogInformation("Creating client via API: {FirstName} {LastName}", firstName, lastName);
 
-        return $"Mitarbeiter {firstName} {lastName} wurde erfolgreich erstellt." +
-               (email != null ? $"\nE-Mail: {email}" : "") +
-               (canton != null ? $"\nKanton: {canton}" : "");
+        try
+        {
+            return await _apiClient.CreateClientAsync(firstName, lastName, email, canton);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create client via API");
+            return $"Error creating employee: {ex.Message}";
+        }
     }
 
     private async Task<string> SearchClientsAsync(JsonElement arguments)
     {
-        var searchTerm = arguments.GetProperty("searchTerm").GetString();
+        var searchTerm = arguments.GetProperty("searchTerm").GetString()!;
         var canton = arguments.TryGetProperty("canton", out var cantonProp) ? cantonProp.GetString() : null;
         var limit = arguments.TryGetProperty("limit", out var limitProp) ? limitProp.GetInt32() : 10;
 
-        _logger.LogInformation("Searching clients: {SearchTerm}", searchTerm);
+        _logger.LogInformation("Searching clients via API: {SearchTerm}", searchTerm);
 
-        var results = new[]
+        try
         {
-            new { Id = "1", FirstName = "Max", LastName = "Muster", Canton = "BE", Email = "max.muster@example.com" },
-            new { Id = "2", FirstName = "Anna", LastName = "Schmidt", Canton = "ZH", Email = "anna.schmidt@example.com" },
-            new { Id = "3", FirstName = "Peter", LastName = "Mueller", Canton = "SG", Email = "peter.mueller@example.com" }
-        };
-
-        var filteredResults = canton != null ?
-            results.Where(r => r.Canton.Equals(canton, StringComparison.OrdinalIgnoreCase)) :
-            results;
-
-        var limitedResults = filteredResults.Take(limit).ToArray();
-
-        return $"Gefunden: {limitedResults.Length} Mitarbeiter mit Suchbegriff '{searchTerm}'" +
-               (canton != null ? $" in Kanton {canton}" : "") +
-               "\n\n" + string.Join("\n", limitedResults.Select(r =>
-                   $"- {r.FirstName} {r.LastName} ({r.Canton}) - {r.Email}"));
+            return await _apiClient.SearchClientsAsync(searchTerm, canton, limit);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to search clients via API");
+            return $"Error searching employees: {ex.Message}";
+        }
     }
 
     private async Task<string> CreateContractAsync(JsonElement arguments)
     {
-        var clientId = arguments.GetProperty("clientId").GetString();
-        var contractType = arguments.GetProperty("contractType").GetString();
-        var canton = arguments.GetProperty("canton").GetString();
+        var clientId = arguments.GetProperty("clientId").GetString()!;
+        var contractType = arguments.GetProperty("contractType").GetString()!;
+        var canton = arguments.GetProperty("canton").GetString()!;
 
-        _logger.LogInformation("Creating contract: {ContractType} for client {ClientId}", contractType, clientId);
+        _logger.LogInformation("Creating contract via API: {ContractType} for client {ClientId}", contractType, clientId);
 
-        return $"Vertrag '{contractType}' fuer Mitarbeiter {clientId} in {canton} wurde erfolgreich erstellt.\n" +
-               $"Erstellungsdatum: {DateTime.Now:dd.MM.yyyy}\n" +
-               $"Kanton: {canton}";
+        try
+        {
+            return await _apiClient.CreateContractAsync(clientId, contractType, canton);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create contract via API");
+            return $"Error creating contract: {ex.Message}";
+        }
     }
 
     private async Task<string> GetSystemInfoAsync()
     {
-        return JsonSerializer.Serialize(new
+        try
         {
-            System = "Klacks Planning System",
-            Version = "1.0.0",
-            Status = "running",
-            Uptime = DateTime.UtcNow.ToString("O"),
-            Capabilities = new[] { "client_management", "contract_management", "search", "mcp_protocol", "documentation" },
-            SupportedLanguages = new[] { "de", "en", "fr", "it" },
-            AvailableTools = new[] { "create_client", "search_clients", "create_contract", "get_system_info", "validate_calendar_rule" },
-            AvailableDocs = new[] { "general", "clients", "shifts", "identity-providers", "macros", "calendar-rules", "ai-system" }
-        }, new JsonSerializerOptions { WriteIndented = true });
+            return await _apiClient.GetSystemInfoAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get system info via API");
+            return JsonSerializer.Serialize(new
+            {
+                System = "Klacks Planning System",
+                Status = "degraded",
+                Error = ex.Message,
+                Timestamp = DateTime.UtcNow.ToString("O")
+            }, new JsonSerializerOptions { WriteIndented = true });
+        }
     }
 
     private async Task<string> ValidateCalendarRuleAsync(JsonElement arguments)
@@ -577,47 +587,46 @@ public class MCPServerService : BackgroundService
 
     private async Task<string> GetClientsResourceAsync()
     {
-        return JsonSerializer.Serialize(new
+        try
         {
-            Clients = new[]
+            return await _apiClient.GetClientsListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch clients resource via API");
+            return JsonSerializer.Serialize(new
             {
-                new { Id = "1", FirstName = "Max", LastName = "Muster", Canton = "BE", Email = "max.muster@example.com", CreatedAt = "2024-01-15T10:30:00Z" },
-                new { Id = "2", FirstName = "Anna", LastName = "Schmidt", Canton = "ZH", Email = "anna.schmidt@example.com", CreatedAt = "2024-02-20T14:15:00Z" },
-                new { Id = "3", FirstName = "Peter", LastName = "Mueller", Canton = "SG", Email = "peter.mueller@example.com", CreatedAt = "2024-03-10T09:45:00Z" }
-            },
-            Total = 3,
-            LastUpdated = DateTime.UtcNow.ToString("O")
-        }, new JsonSerializerOptions { WriteIndented = true });
+                Error = $"Failed to fetch clients: {ex.Message}",
+                LastUpdated = DateTime.UtcNow.ToString("O")
+            }, new JsonSerializerOptions { WriteIndented = true });
+        }
     }
 
     private async Task<string> GetSystemStatusAsync()
     {
-        return JsonSerializer.Serialize(new
+        try
         {
-            Status = "running",
-            Timestamp = DateTime.UtcNow.ToString("O"),
-            Version = "1.0.0",
-            Features = new[] { "LLM", "MCP", "WebUI", "ClientManagement", "ContractManagement", "Documentation" },
-            Health = new
+            return await _apiClient.GetSystemStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch system status via API");
+            return JsonSerializer.Serialize(new
             {
-                Database = "healthy",
-                API = "healthy",
-                MCP = "healthy"
-            }
-        }, new JsonSerializerOptions { WriteIndented = true });
+                Status = "degraded",
+                Timestamp = DateTime.UtcNow.ToString("O"),
+                Error = ex.Message,
+                Health = new { Database = "unknown", API = "unreachable", MCP = "healthy" }
+            }, new JsonSerializerOptions { WriteIndented = true });
+        }
     }
 
     private async Task<string> GetContractsResourceAsync()
     {
         return JsonSerializer.Serialize(new
         {
-            Contracts = new[]
-            {
-                new { Id = "C001", ClientId = "1", Type = "Vollzeit 160", Canton = "BE", CreatedAt = "2024-01-16T11:00:00Z" },
-                new { Id = "C002", ClientId = "2", Type = "Teilzeit 80", Canton = "ZH", CreatedAt = "2024-02-21T15:30:00Z" },
-                new { Id = "C003", ClientId = "3", Type = "Vollzeit 180", Canton = "SG", CreatedAt = "2024-03-11T08:20:00Z" }
-            },
-            Total = 3,
+            Message = "Contract listing requires client-specific API call. Use search_clients first, then create_contract.",
+            Hint = "Contract resources are accessed through the client management API.",
             LastUpdated = DateTime.UtcNow.ToString("O")
         }, new JsonSerializerOptions { WriteIndented = true });
     }
